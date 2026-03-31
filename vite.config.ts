@@ -4,5 +4,6 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/teleprompter-app/',
+  // Use relative asset paths so GitHub Pages works regardless of repository path.
+  base: './',
 })
