@@ -1,0 +1,65 @@
+/* Design tokens from spec */
+:root {
+  --primary: #3b82f6;
+  --secondary: #22c55e;
+  --bg: #0b1220;
+  --surface: #0f172a;
+  --surface-2: #020617;
+  --muted: #111827;
+  --border: #1f2937;
+  --text: #e5e7eb;
+  --subtext: #9ca3af;
+  --warning: #f59e0b;
+  --focus: #3b82f6;
+
+  --radius: 12px;
+  --radius-sm: 10px;
+  --shadow:
+    rgba(0, 0, 0, 0.35) 0 16px 32px -12px,
+    rgba(0, 0, 0, 0.25) 0 8px 16px -12px;
+
+  --sans: system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: ui-monospace, Consolas, "SFMono-Regular", Menlo, Monaco, "Liberation Mono",
+    "Courier New", monospace;
+
+  color-scheme: dark;
+  font: 16px/1.45 var(--sans);
+  letter-spacing: 0.2px;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+textarea {
+  resize: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
