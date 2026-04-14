@@ -4,7 +4,7 @@ import {
   Upload, Settings, CheckSquare,
   MousePointerClick, Info, X, Send, ShieldCheck,
   Share2, FolderOpen, ArrowLeft, Eye,
-  FileImage, Plus, LogOut, Columns, Copy, Calendar, Mail, Lock, Square, LayoutTemplate, Link, Download, Ruler
+  FileImage, Plus, Minus, LogOut, Columns, Copy, Calendar, Mail, Lock, Square, LayoutTemplate, Link, Download, Ruler
 } from 'lucide-react';
 
 import localforage from 'localforage';
@@ -73,6 +73,13 @@ const translations = {
     comment_placeholder_marker: "針對標註點發表建議...",
     comment_placeholder_general: "一般留言...",
     send: "送出",
+
+    s1_action_discuss: "1. 有意見 (轉送簽客戶)",
+    s1_action_advance: "2. 無意見 (送簽給客戶, 進入 Stage 2)",
+    s2_action_discuss: "1. 有意見 (回送設計師討論)",
+    s2_action_advance: "2. 無意見 (完稿確認, 進入 Stage 3)",
+    s3_action_discuss: "1. 有意見 (返還客戶詢問)",
+    s3_action_advance: "2. 無意見 (結案, 執行製作)",
 
     sop_stage1: "Stage 1: 確認規格、檔案預檢與版本控制",
     sop_s1_desc: "設計師上傳，確認規格、檔案預檢與版本控制。",
@@ -214,6 +221,13 @@ const translations = {
     comment_placeholder_marker: "Add a comment for this marker...",
     comment_placeholder_general: "General comment...",
     send: "Send",
+
+    s1_action_discuss: "1. Have comments (Send to Client)",
+    s1_action_advance: "2. No comments (Send to Client, enter Stage 2)",
+    s2_action_discuss: "1. Have comments (Return to Designer)",
+    s2_action_advance: "2. No comments (Confirm Final, enter Stage 3)",
+    s3_action_discuss: "1. Have comments (Return to Client)",
+    s3_action_advance: "2. No comments (Finalize, send to print)",
 
     sop_stage1: "Stage 1: Specs & Pre-flight",
     sop_s1_desc: "Designer uploads, confirms specs, file pre-flight and version control.",
@@ -414,6 +428,7 @@ export default function App() {
 
   const imageRef = useRef(null);
   const lastCloudDataRef = useRef(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const activeProject = projects.find(p => p.id === activeProjectId);
   const activeFile = activeProject?.files.find(f => f.id === activeFileId);
@@ -590,28 +605,67 @@ export default function App() {
     }));
   };
 
-  const handleActionClick = () => {
-    if (currentUser.role === 'designer') {
-      const currentStageObj = activeFile?.checklists?.[`stage${activeFile?.stage}`];
+  const handleStageAction = (actionType) => {
+    if (actionType === 's1_discuss') {
+      setNotifyRecipients(activeProject?.defaultClientEmail || '');
+      setPendingAction('s1_discuss');
+      setShowNotifyModal(true);
+    } else if (actionType === 's1_advance') {
+      const currentStageObj = activeFile?.checklists?.[`stage1`];
       if (currentStageObj) {
         const allChecked = Object.values(currentStageObj).every(val => val === true);
         if (!allChecked) {
-          showToast(t(`toast_block_s${activeFile.stage}`));
+          showToast(t(`toast_block_s1`));
           return;
         }
       }
       setNotifyRecipients(activeProject?.defaultClientEmail || '');
-      setPendingAction('review');
+      setPendingAction('s1_advance');
       setShowNotifyModal(true);
-    } else if (currentUser.role === 'client') {
+    } else if (actionType === 's2_advance') {
+      const currentStageObj = activeFile?.checklists?.[`stage2`];
+      if (currentStageObj && currentUser.role === 'designer') {
+        const allChecked = Object.values(currentStageObj).every(val => val === true);
+        if (!allChecked) {
+          showToast(t(`toast_block_s2`));
+          return;
+        }
+      }
       setNotifyRecipients(activeProject?.defaultDesignerEmail || '');
-      setPendingAction('approve');
+      setPendingAction('s2_advance');
       setShowNotifyModal(true);
+    } else if (actionType === 's3_advance') {
+      finalizeFile(activeProjectId, activeFileId);
     }
   };
 
-  const handleReturnRevision = () => {
+  const handleReturnRevision = async () => {
     if (!window.confirm("確定要將此階段返還簽核退回嗎？")) return;
+
+    // Send email notification to previous-stage recipient
+    const baseUrl = window.location.origin;
+    const projectLink = `${baseUrl}/p/${activeFile.id}`;
+    const prevStageRecipient = currentUser.role === 'client'
+      ? activeProject?.defaultDesignerEmail   // client returns → notify designer
+      : activeProject?.defaultClientEmail;     // designer returns → notify client
+    if (prevStageRecipient) {
+      const subject = `[返還簽核] ${activeProject.title} - ${activeFile.name} (Stage ${activeFile.stage} → ${Math.max(1, activeFile.stage - 1)})`;
+      const text = `${currentUser.name} 已將檔案返還簽核，請重新確認並送審。\n專案連結: ${projectLink}`;
+      try {
+        await emailjs.send('service_xn79iw9', 'template_xetd0oo', {
+          from_name: currentUser.name,
+          from_email: currentUser.email,
+          to_email: prevStageRecipient,
+          client_name: activeProject.client || 'Customer',
+          project_link: projectLink,
+          subject,
+          message: text
+        }, 'E0y1n-5yyxI0sQuls');
+      } catch (err) {
+        console.error('Return revision email failed:', err);
+      }
+    }
+
     setProjects(prev => prev.map(p => {
       if (p.id !== activeProjectId) return p;
       return {
@@ -630,24 +684,27 @@ export default function App() {
   };
 
   const confirmSendNotification = async (skipEmail = false) => {
-    // 防止 React 事件物件被誤認為 skipEmail = true
     const shouldSkip = skipEmail === true;
-
     setShowNotifyModal(false);
     setIsSendingEmail(true);
 
     let apiSuccess = false;
     if (!shouldSkip) {
       const baseUrl = window.location.origin;
-      const projectLink = `${baseUrl}/p/${activeFile.id}${pendingAction === 'review' ? '?role=reviewer' : ''}`;
+      const projectLink = `${baseUrl}/p/${activeFile.id}${pendingAction.includes('discuss') ? '?role=reviewer' : ''}`;
 
-      const subject = pendingAction === 'review'
-        ? `[審核請求] ${activeProject.title} - ${activeFile.name} (Stage ${activeFile.stage})`
-        : `[核准通知] ${activeProject.title} - ${activeFile.name} (Stage ${activeFile.stage})`;
-
-      const text = pendingAction === 'review'
-        ? `設計師已更新項目，請前往系統審核檔案: ${projectLink}`
-        : `客戶已核准 ${activeFile.name}，檔案順利推進，請前往系統確認: ${projectLink}`;
+      let subject = '';
+      let text = '';
+      if (pendingAction === 's1_discuss') {
+        subject = `[討論提問] ${activeProject.title} - ${activeFile.name} (Stage 1)`;
+        text = `設計師已上傳檔案並提出討論點，請前往系統確認與回覆: ${projectLink}`;
+      } else if (pendingAction === 's1_advance') {
+        subject = `[審核請求] ${activeProject.title} - ${activeFile.name} (進入 Stage 2)`;
+        text = `設計師已送簽確認無誤，檔案推進至 Stage 2，請前往系統進行校對與審核: ${projectLink}`;
+      } else if (pendingAction === 's2_advance') {
+        subject = `[完稿確認] ${activeProject.title} - ${activeFile.name} (進入 Stage 3)`;
+        text = `客戶已完稿確認，檔案推進至 Stage 3 (最終核准)，請前往系統確認: ${projectLink}`;
+      }
 
       try {
         const templateParams = {
@@ -659,37 +716,28 @@ export default function App() {
           subject: subject,
           message: text
         };
-
-        console.log('--- EmailJS Debug Log ---');
-        console.log('Service ID:', 'service_xn79iw9');
-        console.log('Template ID:', 'template_xetd0oo');
-        console.log('Public Key:', 'E0y1n-5yyxI0sQuls');
-        console.log('Template Params:', templateParams);
-
         const response = await emailjs.send('service_xn79iw9', 'template_xetd0oo', templateParams, 'E0y1n-5yyxI0sQuls');
-
-        console.log('EmailJS Success:', response);
         apiSuccess = true;
       } catch (err) {
         console.error('EmailJS Error:', err);
         apiSuccess = false;
       }
     } else {
-      apiSuccess = true; // explicitly force success path for skipped email
+      apiSuccess = true;
     }
 
     setTimeout(() => {
       setIsSendingEmail(false);
-      if (pendingAction === 'review') {
-        showToast(apiSuccess ? t('toast_review_sent', { stage: activeFile.stage }) : t('toast_review_simulated'));
-      } else if (pendingAction === 'approve') {
+      if (pendingAction === 's1_discuss') {
+        showToast(apiSuccess ? t('toast_review_sent', { stage: 1 }) : t('toast_review_simulated'));
+      } else if (pendingAction === 's1_advance' || pendingAction === 's2_advance') {
         setProjects(prev => prev.map(p => {
           if (p.id !== activeProjectId) return p;
           return {
             ...p,
             files: p.files.map(f => {
               if (f.id !== activeFileId) return f;
-              const newStage = f.stage < 3 ? f.stage + 1 : 3;
+              const newStage = pendingAction === 's1_advance' ? 2 : 3;
               const versions = [...f.versions];
               versions[versions.length - 1].status = 'approved';
               return { ...f, stage: newStage, versions };
@@ -703,7 +751,6 @@ export default function App() {
 
   const handleDeleteVersion = (e, index) => {
     e.stopPropagation();
-    if (currentUser.role !== 'observer') return;
     if (activeFile.versions.length <= 1) {
       return showToast(t('toast_cannot_delete_last'));
     }
@@ -864,6 +911,18 @@ export default function App() {
     showToast(t('toast_project_finalized'));
   };
 
+  const finalizeFile = (projectId, fileId) => {
+    if (!window.confirm('確定要結案此圖檔嗎？結案後無法再更新或留言！')) return;
+    setProjects(prev => prev.map(p => {
+      if (p.id !== projectId) return p;
+      return {
+        ...p,
+        files: p.files.map(f => f.id === fileId ? { ...f, status: 'closed' } : f)
+      }
+    }));
+    showToast('該檔案已成功結案！');
+  };
+
   // ================= 滑鼠標註邏輯 (點擊與框選) =================
   const handlePointerDown = (e) => {
     if (!imageRef.current || currentUser.role === 'observer' || isComparing) return;
@@ -940,6 +999,7 @@ export default function App() {
       author: `${currentUser.name} (${currentUser.role === 'designer' ? t('role_name_designer') : currentUser.role === 'client' ? t('role_name_client') : t('role_name_observer')})`,
       text: commentInput,
       resolved: false,
+      isoTimestamp: new Date().toISOString(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       ...(newMarker || {})
     };
@@ -1210,11 +1270,17 @@ export default function App() {
                               }`}>
                               {(() => {
                                 const lastStatus = file.versions[file.versions.length - 1]?.status;
-                                if (lastStatus === 'approved') {
-                                  return file.stage === 3 ? t('status_fully_approved') : t('status_waiting_designer', { stage: file.stage + 1 });
-                                } else {
-                                  return file.stage === 3 ? t('status_waiting_supervisor', { stage: file.stage }) : t('status_waiting_client', { stage: file.stage });
+                                if (lastStatus === 'closed' || file.status === 'closed') {
+                                  return t('status_closed');
                                 }
+                                if (file.stage === 1) {
+                                  return t('status_waiting_designer', { stage: 1 });
+                                } else if (file.stage === 2) {
+                                  return t('status_waiting_client', { stage: 2 });
+                                } else if (file.stage === 3) {
+                                  return t('status_waiting_designer', { stage: 3 });
+                                }
+                                return t('status_reviewing');
                               })()}
                             </span>
                           </div>
@@ -1251,12 +1317,6 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowRuler(!showRuler)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${showRuler ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-              >
-                <Columns size={16} /> {t('ruler_toggle')}
-              </button>
               <div className="bg-slate-100 rounded-lg p-1 flex">
                 {!isComparing ? (
                   <div className="flex items-center gap-1">
@@ -1264,7 +1324,7 @@ export default function App() {
                       <button key={v.versionNumber} onClick={() => { setActiveVersionIndex(idx); setNewMarker(null); }} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center group ${activeVersionIndex === idx ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}>
                         {t('version_tag', { v: v.versionNumber })}
                         <span className="ml-1 text-[9px] font-normal text-slate-400 truncate max-w-[150px] hidden sm:inline-block">{v.uploader || t('version_uploader_unknown')}</span>
-                        {currentUser?.role === 'observer' && activeFile?.versions.length > 1 && (
+                        {activeFile?.versions.length > 1 && (
                           <div onClick={(e) => handleDeleteVersion(e, idx)} className="ml-1.5 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 rounded-full hover:bg-red-50 p-0.5 transition-all" title="Delete Version">
                             <X size={12} strokeWidth={3} />
                           </div>
@@ -1313,14 +1373,38 @@ export default function App() {
                   {t('status_closed')}
                 </div>
               )}
-              {currentUser?.role !== 'observer' && activeProject?.status !== 'closed' && (
+              {currentUser?.role !== 'observer' && activeProject?.status !== 'closed' && activeFile && (
                 <>
-                  <button onClick={handleReturnRevision} disabled={isSendingEmail} className="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-rose-100">
-                    {t('return_for_revision')}
-                  </button>
-                  <button onClick={handleActionClick} disabled={isSendingEmail} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-blue-700">
-                    {isSendingEmail ? t('processing') : currentUser?.role === 'designer' ? t('send_review_notice') : t('approve_design')}
-                  </button>
+                  {activeFile.stage === 1 && currentUser.role === 'designer' && (
+                    <>
+                      <button onClick={() => handleStageAction('s1_discuss')} disabled={isSendingEmail} className="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-rose-100 transition-all">
+                        {isSendingEmail && pendingAction === 's1_discuss' ? t('processing') : t('s1_action_discuss')}
+                      </button>
+                      <button onClick={() => handleStageAction('s1_advance')} disabled={isSendingEmail} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-blue-700 transition-all">
+                        {isSendingEmail && pendingAction === 's1_advance' ? t('processing') : t('s1_action_advance')}
+                      </button>
+                    </>
+                  )}
+                  {activeFile.stage === 2 && currentUser.role === 'client' && (
+                    <>
+                      <button onClick={() => handleReturnRevision()} disabled={isSendingEmail} className="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-rose-100 transition-all">
+                        {t('s2_action_discuss')}
+                      </button>
+                      <button onClick={() => handleStageAction('s2_advance')} disabled={isSendingEmail} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-blue-700 transition-all">
+                        {isSendingEmail && pendingAction === 's2_advance' ? t('processing') : t('s2_action_advance')}
+                      </button>
+                    </>
+                  )}
+                  {activeFile.stage === 3 && currentUser.role === 'designer' && (
+                    <>
+                      <button onClick={() => handleReturnRevision()} disabled={isSendingEmail} className="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-rose-100 transition-all">
+                        {t('s3_action_discuss')}
+                      </button>
+                      <button onClick={() => handleStageAction('s3_advance')} disabled={isSendingEmail} className="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-emerald-700 transition-all">
+                        <CheckCircle2 size={14} /> {t('s3_action_advance')}
+                      </button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -1337,9 +1421,18 @@ export default function App() {
                 <button onClick={() => setDrawingMode('box')} className={`p-2 rounded-md ${drawingMode === 'box' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100'}`} title="框選標註">
                   <Square size={20} />
                 </button>
-                <button onClick={() => { setDrawingMode('measure'); setShowMeasureInfo(true); }} className={`p-2 rounded-md ${drawingMode === 'measure' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100'}`} title="測量工具">
+                <button onClick={() => setDrawingMode('measure')} className={`p-2 rounded-md ${drawingMode === 'measure' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100'}`} title="測量距離">
                   <Ruler size={20} />
                 </button>
+
+                <div className="w-full h-px bg-slate-200 my-1"></div>
+
+                <div className="flex flex-col items-center gap-1">
+                  <button onClick={() => setZoomLevel(Math.min(5, zoomLevel + 0.25))} className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-blue-600" title="放大"><Plus size={16} /></button>
+                  <span className="text-[9px] font-black text-slate-600 tracking-tighter">{Math.round(zoomLevel * 100)}%</span>
+                  <button onClick={() => setZoomLevel(Math.max(0.25, zoomLevel - 0.25))} className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-blue-600" title="縮小"><Minus size={16} /></button>
+                  {zoomLevel !== 1 && <button onClick={() => setZoomLevel(1)} className="mt-1 text-[8px] font-black text-blue-600 hover:text-blue-800">RESET</button>}
+                </div>
               </div>
             )}
 
@@ -1457,7 +1550,8 @@ export default function App() {
 
               {/* 設計原圖區域 */}
               <div
-                className={`w-full bg-white shadow-2xl relative border border-slate-300 touch-none select-none ${isComparing ? 'flex-1 basis-1/2 max-w-[calc(50%-0.5rem)]' : 'max-w-4xl'} ${drawingMode === 'box' && !isComparing ? 'cursor-crosshair' : 'cursor-pointer'}`}
+                className={`w-full bg-white shadow-2xl relative border border-slate-300 touch-none select-none transition-all duration-300 ${isComparing ? 'flex-1 basis-1/2 max-w-[calc(50%-0.5rem)]' : ''} ${drawingMode === 'box' && !isComparing ? 'cursor-crosshair' : 'cursor-pointer'}`}
+                style={isComparing ? {} : { maxWidth: `${56 * zoomLevel}rem` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -1558,22 +1652,32 @@ export default function App() {
               <div className="flex-1 overflow-y-auto p-4 bg-slate-50 relative">
                 {activeTab === 'comments' && (
                   <div className="space-y-4 pb-32">
-                    {activeVersion?.markers?.map((m, idx) => (
-                      <div key={m.id} className={`p-4 rounded-xl border ${m.resolved ? 'bg-white opacity-60' : 'bg-white shadow-sm border-blue-100'}`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${m.resolved ? 'bg-emerald-500' : m.type === 'box' ? 'bg-purple-500' : 'bg-red-500'}`}>
-                              #{idx + 1} {m.type === 'box' ? t('marker_box') : t('marker_pin')}
-                            </span>
-                            <span className="text-xs font-bold">{m.author}</span>
+                    {[...(activeVersion?.markers || [])]
+                      .filter(m => m.type !== 'measure')
+                      .sort((a, b) => {
+                        const ta = a.isoTimestamp || a.timestamp || '';
+                        const tb = b.isoTimestamp || b.timestamp || '';
+                        return ta < tb ? -1 : ta > tb ? 1 : 0;
+                      })
+                      .map((m, idx) => (
+                        <div key={m.id} className={`p-4 rounded-xl border ${m.resolved ? 'bg-white opacity-60' : 'bg-white shadow-sm border-blue-100'}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${m.resolved ? 'bg-emerald-500' : m.type === 'box' ? 'bg-purple-500' : 'bg-red-500'}`}>
+                                #{idx + 1} {m.type === 'box' ? t('marker_box') : t('marker_pin')}
+                              </span>
+                              <span className="text-xs font-bold">{m.author}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {m.timestamp && <span className="text-[10px] text-slate-400">{m.timestamp}</span>}
+                              {currentUser?.role !== 'observer' && (
+                                <button onClick={() => toggleResolve(m.id)} className="text-[10px] underline text-slate-400 hover:text-blue-600">{m.resolved ? t('mark_unresolved') : t('mark_resolved')}</button>
+                              )}
+                            </div>
                           </div>
-                          {currentUser?.role !== 'observer' && (
-                            <button onClick={() => toggleResolve(m.id)} className="text-[10px] underline text-slate-400 hover:text-blue-600">{m.resolved ? t('mark_unresolved') : t('mark_resolved')}</button>
-                          )}
+                          <p className={`text-sm text-slate-700 ${m.resolved && 'line-through opacity-70'}`}>{m.text}</p>
                         </div>
-                        <p className={`text-sm text-slate-700 ${m.resolved && 'line-through opacity-70'}`}>{m.text}</p>
-                      </div>
-                    ))}
+                      ))}
 
                     {newMarker && (
                       <div className="bg-blue-50 p-3 rounded border border-blue-200 text-xs font-bold text-blue-800 flex justify-between items-center">
