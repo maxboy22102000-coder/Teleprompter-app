@@ -5,11 +5,355 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>專業設計校稿平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap"
+        rel="stylesheet">
     <!-- pdf.js 加載 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
+    <style>
+        /* ─── Base font ─── */
+        *,
+        body {
+            font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+        }
+
+        /* ─── Custom scrollbar ─── */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #C4973A55;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #C4973A;
+        }
+
+        /* ════════════════════════════════════════
+         BLUE → DEEP NAVY  (#1B2B4B family)
+         Replace Tailwind's royal-blue palette
+         ════════════════════════════════════════ */
+
+        /* Solid backgrounds */
+        .bg-blue-600 {
+            background-color: #1B2B4B !important;
+        }
+
+        .bg-blue-700 {
+            background-color: #142038 !important;
+        }
+
+        .bg-blue-500 {
+            background-color: #243761 !important;
+        }
+
+        .bg-blue-400 {
+            background-color: #2E4A7A !important;
+        }
+
+        .bg-blue-100 {
+            background-color: #E8ECF5 !important;
+        }
+
+        .bg-blue-50 {
+            background-color: #F2F4F9 !important;
+        }
+
+        /* Hover variants */
+        .hover\:bg-blue-700:hover {
+            background-color: #142038 !important;
+        }
+
+        .hover\:bg-blue-600:hover {
+            background-color: #1B2B4B !important;
+        }
+
+        .hover\:border-blue-500:hover {
+            border-color: #1B2B4B !important;
+        }
+
+        .hover\:border-blue-400:hover {
+            border-color: #2E4A7A !important;
+        }
+
+        .hover\:bg-blue-50:hover {
+            background-color: #F2F4F9 !important;
+        }
+
+        /* Text */
+        .text-blue-600 {
+            color: #1B2B4B !important;
+        }
+
+        .text-blue-700 {
+            color: #142038 !important;
+        }
+
+        .text-blue-500 {
+            color: #243761 !important;
+        }
+
+        /* Borders */
+        .border-blue-600 {
+            border-color: #1B2B4B !important;
+        }
+
+        .border-blue-500 {
+            border-color: #243761 !important;
+        }
+
+        .border-blue-400 {
+            border-color: #2E4A7A !important;
+        }
+
+        .border-blue-200 {
+            border-color: #C2CEDF !important;
+        }
+
+        .border-blue-100 {
+            border-color: #D8DFF0 !important;
+        }
+
+        .border-b-2.border-blue-600 {
+            border-bottom-color: #1B2B4B !important;
+        }
+
+        /* Ring / focus */
+        .ring-blue-500\/30 {
+            --tw-ring-color: rgba(27, 43, 75, 0.25) !important;
+        }
+
+        .focus\:border-blue-500:focus {
+            border-color: #1B2B4B !important;
+        }
+
+        .focus\:ring-blue-300:focus {
+            --tw-ring-color: rgba(46, 74, 122, 0.35) !important;
+        }
+
+        /* Gradient overrides */
+        /* Auth login background */
+        .from-slate-900.via-blue-900 {
+            --tw-gradient-via: #0F1A2E !important;
+        }
+
+        /* Dashboard header logo / CTA gradient */
+        .from-blue-600.to-indigo-600 {
+            background-image: linear-gradient(to right, #1B2B4B, #2D1F4A) !important;
+        }
+
+        /* Dashboard header backdrop */
+        .from-blue-100.to-blue-50 {
+            background-image: linear-gradient(to right, #E8ECF5, #F2F4F9) !important;
+        }
+
+        /* Decorative blur orbs */
+        .bg-blue-400\/10 {
+            background-color: rgba(46, 74, 122, 0.08) !important;
+        }
+
+        /* ════════════════════════════════════════
+         EMERALD / GREEN → FOREST  (#1A5C38 family)
+         ════════════════════════════════════════ */
+        .bg-emerald-600 {
+            background-color: #1A5C38 !important;
+        }
+
+        .bg-emerald-700 {
+            background-color: #124028 !important;
+        }
+
+        .bg-emerald-500 {
+            background-color: #217348 !important;
+        }
+
+        .bg-emerald-100 {
+            background-color: #DCF0E5 !important;
+        }
+
+        .bg-emerald-50 {
+            background-color: #EEF8F2 !important;
+        }
+
+        .text-emerald-600 {
+            color: #1A5C38 !important;
+        }
+
+        .text-emerald-700 {
+            color: #124028 !important;
+        }
+
+        .text-emerald-500 {
+            color: #217348 !important;
+        }
+
+        .border-emerald-500 {
+            border-color: #217348 !important;
+        }
+
+        .border-emerald-200 {
+            border-color: #AEDCC2 !important;
+        }
+
+        .hover\:bg-emerald-700:hover {
+            background-color: #124028 !important;
+        }
+
+        .hover\:bg-emerald-50:hover {
+            background-color: #EEF8F2 !important;
+        }
+
+        .hover\:border-emerald-500:hover {
+            border-color: #217348 !important;
+        }
+
+        .from-emerald-100.to-emerald-50 {
+            background-image: linear-gradient(to right, #DCF0E5, #EEF8F2) !important;
+        }
+
+        .bg-emerald-400\/10 {
+            background-color: rgba(26, 92, 56, 0.07) !important;
+        }
+
+        /* ════════════════════════════════════════
+         INDIGO overrides (used in gradients)
+         ════════════════════════════════════════ */
+        .bg-indigo-600 {
+            background-color: #2D1F4A !important;
+        }
+
+        .to-indigo-600 {
+            --tw-gradient-to: #2D1F4A !important;
+        }
+
+        .text-indigo-600 {
+            color: #2D1F4A !important;
+        }
+
+        /* ════════════════════════════════════════
+         PURPLE badge (observer role) → Warm Plum
+         ════════════════════════════════════════ */
+        .bg-purple-100 {
+            background-color: #EDE8F5 !important;
+        }
+
+        .bg-purple-50 {
+            background-color: #F5F2FA !important;
+        }
+
+        .text-purple-600 {
+            color: #5B3A8C !important;
+        }
+
+        .text-purple-700 {
+            color: #4A2F73 !important;
+        }
+
+        .border-purple-500 {
+            border-color: #7C55B8 !important;
+        }
+
+        .from-purple-100.to-purple-50 {
+            background-image: linear-gradient(to right, #EDE8F5, #F5F2FA) !important;
+        }
+
+        .hover\:bg-purple-50:hover {
+            background-color: #F5F2FA !important;
+        }
+
+        .hover\:border-purple-500:hover {
+            border-color: #7C55B8 !important;
+        }
+
+        .bg-purple-500 {
+            background-color: #7C55B8 !important;
+        }
+
+        /* ════════════════════════════════════════
+         SHADOW accent — shadow-blue-200 → navy tint
+         ════════════════════════════════════════ */
+        .shadow-blue-200 {
+            --tw-shadow-color: rgba(27, 43, 75, 0.25) !important;
+        }
+
+        .shadow-lg.shadow-blue-200 {
+            box-shadow: 0 10px 25px rgba(27, 43, 75, 0.2) !important;
+        }
+
+        /* ════════════════════════════════════════
+         WARM SAND default background
+         ════════════════════════════════════════ */
+        .bg-slate-50 {
+            background-color: #F8F7F3 !important;
+        }
+
+        /* ════════════════════════════════════════
+         AUTH COVER — premium multi-stop gradient
+         Targets the login page full-screen wrapper
+         ════════════════════════════════════════ */
+        .from-slate-900.via-blue-900.to-emerald-900 {
+            background-image: none !important;
+            background-color: transparent !important;
+            position: relative;
+        }
+
+        /* The actual gradient lives here */
+        .from-slate-900.via-blue-900.to-emerald-900::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                linear-gradient(135deg,
+                    #0D0E14 0%,
+                    #1A1235 28%,
+                    #0F2225 58%,
+                    #1C1010 85%,
+                    #0A0A0F 100%);
+        }
+
+        /* Subtle grid-line texture overlay */
+        .from-slate-900.via-blue-900.to-emerald-900::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: 48px 48px;
+            pointer-events: none;
+        }
+
+        /* Children must sit above the pseudo-elements */
+        .from-slate-900.via-blue-900.to-emerald-900>* {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Slightly warm-up the white card on top */
+        .from-slate-900.via-blue-900.to-emerald-900 .bg-white\/95 {
+            background-color: rgba(250, 248, 244, 0.97) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+
+        /* Header gradient inside the card (brand strip) */
+        .from-slate-900.via-blue-900.to-emerald-900 .from-blue-600.to-indigo-600 {
+            background-image: linear-gradient(120deg, #1A1235 0%, #1F3424 60%, #2A1A10 100%) !important;
+        }
+    </style>
 </head>
 
 <body>
